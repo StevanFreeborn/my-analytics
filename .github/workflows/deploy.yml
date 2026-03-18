@@ -49,10 +49,5 @@ jobs:
           envs: DOCKERHUB_USERNAME,IMAGE_TAG,ADMIN_USERNAME,ADMIN_PASSWORD,SECRET_KEY
           script: |
             cd myanalytics.stevanfreeborn.com
-            echo "DOCKERHUB_USERNAME=${DOCKERHUB_USERNAME}" > .env
-            echo "IMAGE_TAG=${IMAGE_TAG}" >> .env
-            echo "ADMIN_USERNAME=${ADMIN_USERNAME}" >> .env
-            echo "ADMIN_PASSWORD=${ADMIN_PASSWORD}" >> .env
-            echo "SECRET_KEY=${SECRET_KEY}" >> .env
             docker compose pull
             docker compose up -d
