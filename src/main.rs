@@ -4,20 +4,17 @@ mod db;
 mod error;
 mod routes;
 mod templates;
+mod setup;
 
 use std::sync::Arc;
 
 use axum::{Router, middleware};
-use axum_extra::extract::cookie::Key;
-use sha2::{Digest, Sha512};
-use tokio::signal;
 use tower_http::{
   cors::{Any, CorsLayer},
   trace::TraceLayer,
 };
-use tracing::{info, warn};
+use tracing::info;
 use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitExt};
-use uuid::Uuid;
 
 use crate::{auth::CookieKey, config::Config, db::Database};
 
@@ -46,60 +43,11 @@ async fn main() -> anyhow::Result<()> {
   let db = Database::new(&config.database_url).await?;
 
   db.migrate().await?;
+  setup::seed_admin_user(&db, &config).await?;
 
-  let user_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM users")
-    .fetch_one(&db.pool)
-    .await?;
-
-  if user_count == 0 {
-    let password = match &config.admin_password {
-      Some(p) => p.clone(),
-      None => {
-        let generated = Uuid::new_v4().to_string().replace('-', "");
-        warn!(
-          "No ADMIN_PASSWORD set. Generated admin password: {}",
-          generated
-        );
-        generated
-      }
-    };
-
-    let hash = auth::hash_password(&password)?;
-    let id = Uuid::new_v4().to_string();
-    let now = chrono::Utc::now().to_rfc3339();
-
-    sqlx::query("INSERT INTO users (id, username, password_hash, created_at, updated_at) VALUES (?, ?, ?, ?, ?)")
-      .bind(&id)
-      .bind(&config.admin_username)
-      .bind(&hash)
-      .bind(&now)
-      .bind(&now)
-      .execute(&db.pool)
-      .await?;
-
-    info!("Created admin user '{}'", config.admin_username);
-  }
-
-  let raw_key: Key = match &config.secret_key {
-    Some(k) => {
-      let digest = Sha512::digest(k.as_bytes());
-      let mut bytes = [0u8; 64];
-      bytes.copy_from_slice(&digest);
-      Key::from(&bytes)
-    }
-    None => {
-      warn!(
-        "No SECRET_KEY set. Generating a random cookie key — \
-          users will be logged out on every restart. \
-          Set SECRET_KEY to a long random string to persist sessions."
-      );
-      Key::generate()
-    }
-  };
+  let raw_key = setup::get_secret_key(&config).await;
   let cookie_key = CookieKey(raw_key);
-
   let templates = templates::Templates::new()?;
-
   let state: AppState = Arc::new(AppStateInner {
     db,
     config: config.clone(),
@@ -133,33 +81,9 @@ async fn main() -> anyhow::Result<()> {
   info!("Starting server on http://{}", bind_addr);
 
   axum::serve(listener, app)
-    .with_graceful_shutdown(shutdown_signal())
+    .with_graceful_shutdown(setup::handle_graceful_shutdown())
     .await?;
 
   info!("Server shut down gracefully.");
   Ok(())
-}
-
-async fn shutdown_signal() {
-  let ctrl_c = async {
-    signal::ctrl_c()
-      .await
-      .expect("failed to install Ctrl+C handler");
-  };
-
-  #[cfg(unix)]
-  let terminate = async {
-    signal::unix::signal(signal::unix::SignalKind::terminate())
-      .expect("failed to install SIGTERM handler")
-      .recv()
-      .await;
-  };
-
-  #[cfg(not(unix))]
-  let terminate = std::future::pending::<()>();
-
-  tokio::select! {
-      _ = ctrl_c => { info!("Received Ctrl+C, shutting down..."); },
-      _ = terminate => { info!("Received SIGTERM, shutting down..."); },
-  }
 }
