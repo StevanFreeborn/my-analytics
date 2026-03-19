@@ -7,10 +7,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   && rm -rf /var/lib/apt/lists/*
 
 COPY Cargo.toml Cargo.lock ./
-RUN mkdir src && echo 'fn main(){}' > src/main.rs
-RUN cargo build --release --locked 2>/dev/null || true
-RUN rm -f src/main.rs
-
 COPY src/ ./src/
 COPY migrations/ ./migrations/
 COPY templates/ ./templates/
@@ -35,6 +31,7 @@ EXPOSE 3000
 ENV HOST=0.0.0.0
 ENV PORT=3000
 ENV DATABASE_URL=sqlite:///app/data/my_analytics.db
+ENV RUST_LOG=my_analytics=debug,tower_http=debug
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
   CMD [ "sh", "-c", "wget -qO- http://localhost:3000/ > /dev/null 2>&1 || exit 1" ]

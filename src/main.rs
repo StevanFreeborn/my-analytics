@@ -32,7 +32,7 @@ pub struct AppStateInner {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-  dotenvy::dotenv()?;
+  dotenvy::dotenv().ok();
 
   tracing_subscriber::registry()
     .with(
