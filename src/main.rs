@@ -3,8 +3,8 @@ mod config;
 mod db;
 mod error;
 mod routes;
-mod templates;
 mod setup;
+mod templates;
 
 use std::sync::Arc;
 
