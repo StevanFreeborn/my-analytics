@@ -34,6 +34,16 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+      - name: Copy compose file to server
+        uses: appleboy/scp-action@v1.0.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
+          source: compose.yml
+          target: myanalytics.stevanfreeborn.com/compose.yml
       - name: Execute remote SSH commands
         uses: appleboy/ssh-action@v1
         env:
