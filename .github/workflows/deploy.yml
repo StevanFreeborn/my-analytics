@@ -43,7 +43,7 @@ jobs:
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_KEY }}
           source: compose.yml
-          target: myanalytics.stevanfreeborn.com/compose.yml
+          target: ./myanalytics.stevanfreeborn.com
       - name: Execute remote SSH commands
         uses: appleboy/ssh-action@v1
         env:
